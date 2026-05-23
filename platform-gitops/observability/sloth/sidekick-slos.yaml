@@ -6,6 +6,11 @@ kind: PrometheusServiceLevel
 metadata:
   name: sidekick
   namespace: sidekick-monitoring
+  annotations:
+    # Sloth CRD ships in the same Application; wait one wave so the CRD is
+    # established before the CR is applied.
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
   labels:
     app.kubernetes.io/managed-by: argocd
     team: platform-sre
