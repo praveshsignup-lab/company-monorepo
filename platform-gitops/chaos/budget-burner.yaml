@@ -1,0 +1,60 @@
+# Chaos: budget-burner. Continuously calls /err on service-a in team-a-prod
+# so http_requests_total{code="500"} climbs, the SLO's 5m + 1h error ratio
+# spikes, and Sloth's MWMBR PageAlert fires end-to-end into Slack via the
+# platform AlertmanagerConfig.
+#
+# Tuning: 1 req/s = 5% steady error rate at 20 rps baseline. Sloth's 0.995
+# objective + 14.4× page burn over 1h means even a low constant error rate
+# will trigger the ticket alert; setting REQS_PER_SEC=20 here saturates.
+#
+# Live toggle: scale to 0 to stop the burn ->
+#   kubectl -n chaos scale deploy/budget-burner --replicas=0
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: budget-burner
+  namespace: chaos
+  labels:
+    app.kubernetes.io/name: budget-burner
+    app.kubernetes.io/part-of: sre-chaos
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: budget-burner
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: budget-burner
+    spec:
+      restartPolicy: Always
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: burner
+          image: curlimages/curl:8.10.1
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: TARGET
+              value: "http://service-a.team-a-prod.svc.cluster.local/err"
+            - name: REQS_PER_SEC
+              value: "20"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              SLEEP=$(awk "BEGIN{printf \"%.3f\", 1/${REQS_PER_SEC}}")
+              echo "burning budget against ${TARGET} at ${REQS_PER_SEC} rps"
+              while true; do
+                curl -fsS -o /dev/null -m 2 "${TARGET}" || true
+                sleep "${SLEEP}"
+              done
+          resources:
+            requests: { cpu: 20m, memory: 16Mi }
+            limits:   { cpu: 100m, memory: 64Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }

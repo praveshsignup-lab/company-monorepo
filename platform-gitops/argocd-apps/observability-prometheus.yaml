@@ -1,0 +1,67 @@
+# kube-prometheus-stack delivered as a Helm-typed ArgoCD Application.
+# Values live in-repo at observability/prometheus/values.yaml so they are
+# code-reviewed alongside the SRE platform.
+#
+# ADOPTION of the pre-existing helm release (one-time):
+#   1) helm uninstall kube-prometheus-stack -n observability --no-hooks
+#      (PVC for Prometheus will be reclaimed; CRDs survive)
+#   2) kubectl apply -n argocd -f observability-prometheus.yaml
+#   3) ArgoCD will re-create Grafana, Prometheus, Alertmanager from scratch.
+#
+# CRDs are NOT installed by this chart Application (set crds=manual via
+# upstream values, see prometheus/values.yaml `crds.enabled: false`-style note).
+# The pre-existing operator already installed them; future upgrades use the
+# upstream `prometheus-operator-crds` chart.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: observability-prometheus
+  namespace: argocd
+  annotations:
+    # Wave -1 so CRDs / Prom + AM exist before the observability overlay
+    # (AlertmanagerConfig, ServiceMonitors) tries to apply.
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  sources:
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      targetRevision: 65.5.0
+      helm:
+        releaseName: kube-prometheus-stack
+        skipCrds: true   # CRDs managed out-of-band; avoids 60MB CRD diff churn.
+        valueFiles:
+          - $values/platform-gitops/observability/prometheus/values.yaml
+    - repoURL: https://github.com/praveshsignup-lab/company-monorepo.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 5m
+  # Operator mutates these constantly; ignore to keep app Synced.
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+    - group: monitoring.coreos.com
+      kind: Alertmanager
+      jsonPointers:
+        - /spec/replicas
