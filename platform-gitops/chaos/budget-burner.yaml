@@ -38,18 +38,27 @@ spec:
           imagePullPolicy: IfNotPresent
           env:
             - name: TARGET
-              value: "http://service-a.team-a-prod.svc.cluster.local/err"
-            - name: REQS_PER_SEC
-              value: "20"
+              value: "http://service-a.team-a-prod.svc.cluster.local"
+            - name: OK_RPS
+              value: "10"           # baseline good traffic
+            - name: ERR_PERIOD_SEC
+              value: "45"           # one /err every 45s (pod crashes,
+                                    # restarts in ~10-20s, SLI dips ~3-5%)
           command: ["/bin/sh", "-c"]
           args:
             - |
               set -eu
-              SLEEP=$(awk "BEGIN{printf \"%.3f\", 1/${REQS_PER_SEC}}")
-              echo "burning budget against ${TARGET} at ${REQS_PER_SEC} rps"
+              OK_SLEEP=$(awk "BEGIN{printf \"%.3f\", 1/${OK_RPS}}")
+              echo "burning: ${OK_RPS} rps OK + 1 /err per ${ERR_PERIOD_SEC}s -> ${TARGET}"
+              (
+                while true; do
+                  sleep "${ERR_PERIOD_SEC}"
+                  curl -fsS -o /dev/null -m 2 "${TARGET}/err" || true
+                done
+              ) &
               while true; do
-                curl -fsS -o /dev/null -m 2 "${TARGET}" || true
-                sleep "${SLEEP}"
+                curl -fsS -o /dev/null -m 2 "${TARGET}/" || true
+                sleep "${OK_SLEEP}"
               done
           resources:
             requests: { cpu: 20m, memory: 16Mi }
