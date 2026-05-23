@@ -1,0 +1,7 @@
+# Single source of truth for the GitOps repo identity.
+# Referenced by every AppProject (sourceRepos) and every Application (repoURL).
+repoURL: https://github.com/praveshsignup-lab/company-monorepo.git
+defaultBranch: main
+# Path INSIDE the repo where platform-gitops lives.
+# Set to "." if this becomes the repo root; "platform-gitops" if it stays a subdir.
+basePath: "."

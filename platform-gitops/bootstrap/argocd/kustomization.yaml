@@ -1,0 +1,47 @@
+# Orchestrator: pulls upstream ArgoCD install + applies our 5 overlay files.
+# Bootstrap with:   kubectl apply -k platform-gitops/bootstrap/argocd
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: argocd
+
+resources:
+  - namespace.yaml
+  # Pin to a known-good release. Bump explicitly via PR.
+  - https://raw.githubusercontent.com/argoproj/argo-cd/v3.4.2/manifests/install.yaml
+  - ingress.yaml
+  - rbac.yaml
+
+# Strategic-merge patches (file paths). Each file may contain multiple docs
+# (separated by `---`) — each must match a resource produced by `resources:`.
+patchesStrategicMerge:
+  - deployment.yaml
+  - service.yaml
+
+# Inline patch: merge our org RBAC into upstream argocd-rbac-cm ConfigMap.
+patches:
+  - target:
+      kind: ConfigMap
+      name: argocd-rbac-cm
+    patch: |-
+      - op: add
+        path: /data
+        value:
+          policy.default: role:readonly
+          scopes: "[groups, email]"
+          policy.csv: |
+            p, role:platform-admin, applications, *, */*, allow
+            p, role:platform-admin, clusters,     *, *,   allow
+            p, role:platform-admin, repositories, *, *,   allow
+            p, role:platform-admin, projects,     *, *,   allow
+            p, role:platform-admin, accounts,     *, *,   allow
+            p, role:team-developer, applications, get,     */*, allow
+            p, role:team-developer, applications, sync,    */*, allow
+            p, role:team-developer, applications, action/*, */*, allow
+            p, role:team-developer, logs,         get,     */*, allow
+            p, role:team-developer, exec,         create,  */*, deny
+            g, platform-sre,  role:platform-admin
+            g, team-a,        role:team-developer
+            g, team-b,        role:team-developer
+            g, team-c,        role:team-developer
+            g, all-engineers, role:readonly

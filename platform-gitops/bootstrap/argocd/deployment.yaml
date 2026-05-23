@@ -1,0 +1,74 @@
+# Strategic-merge patches over the upstream argocd-server Deployment.
+# We do NOT redefine the whole deployment — only the bits we want to override:
+#   * --insecure (TLS terminated at ingress)
+#   * looser liveness/readiness probes (kind/local clusters are slow)
+#   * resource requests/limits (production sizing)
+#   * Prometheus scrape annotations
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-server
+spec:
+  replicas: 2
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8083"
+    spec:
+      containers:
+        - name: argocd-server
+          args:
+            - /usr/local/bin/argocd-server
+            - --insecure                  # TLS at ingress
+            - --port=8080
+            - --metrics-port=8083
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits:   { cpu: 1000m, memory: 1Gi }
+          livenessProbe:
+            httpGet:
+              path: /healthz?full=true
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 6
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-repo-server
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+        - name: argocd-repo-server
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits:   { cpu: 1000m, memory: 1Gi }
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: argocd-application-controller
+spec:
+  template:
+    spec:
+      containers:
+        - name: argocd-application-controller
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits:   { cpu: 2000m, memory: 2Gi }

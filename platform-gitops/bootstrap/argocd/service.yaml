@@ -1,0 +1,24 @@
+# Strategic-merge patch on top of upstream argocd-server Service.
+# Adds the metrics port (8083) so Prometheus can scrape it
+# (ServiceMonitor lives in rbac.yaml).
+apiVersion: v1
+kind: Service
+metadata:
+  name: argocd-server
+  labels:
+    prometheus-scrape: "true"
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: 8080
+      protocol: TCP
+    - name: metrics
+      port: 8083
+      targetPort: 8083
+      protocol: TCP
