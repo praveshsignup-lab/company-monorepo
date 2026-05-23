@@ -1,0 +1,27 @@
+# App-of-apps root. Apply this ONCE with kubectl; ArgoCD then owns everything.
+#   kubectl apply -n argocd -f argocd-apps/root.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/praveshsignup-lab/company-monorepo.git
+    targetRevision: main
+    path: platform-gitops/argocd-apps
+    directory:
+      recurse: false
+      include: "{bootstrap-projects.yaml,observability.yaml}"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

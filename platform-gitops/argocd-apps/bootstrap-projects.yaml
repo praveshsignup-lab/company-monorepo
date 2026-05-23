@@ -1,0 +1,24 @@
+# Installs all AppProjects. Must sync BEFORE any app that references them
+# (sync-wave -1).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: bootstrap-projects
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/praveshsignup-lab/company-monorepo.git
+    targetRevision: main
+    path: platform-gitops/bootstrap/projects
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

@@ -1,0 +1,36 @@
+# Observability overlay (namespace + AlertmanagerConfig + Sloth controller + SLOs
+# + Grafana dashboard ConfigMap). kube-prometheus-stack itself is assumed to be
+# already installed (existing `observability` namespace). This overlay only adds
+# platform-owned bits in `sidekick-monitoring`.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: observability
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/praveshsignup-lab/company-monorepo.git
+    targetRevision: main
+    path: platform-gitops/observability
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sidekick-monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true        # Sloth CRDs are large
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
