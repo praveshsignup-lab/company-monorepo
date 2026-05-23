@@ -1,8 +1,8 @@
-# Team A → service-a deployed to dev/staging/prod via list generator.
-# Each generated Application:
-#   - belongs to AppProject team-a
-#   - syncs path applications/service-a/overlays/{env}
-#   - deploys into namespace team-a-{env}
+# Team A → service-a deployed to dev/staging/prod.
+# Multi-source Application: chart from service repo, env values from gitops repo.
+#
+#   App behavior change (new endpoint) -> PR to praveshsignup-lab/service-a
+#   Runtime change (replicas, mem)     -> PR to platform-gitops/services/service-a/<env>/values.yaml
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -14,9 +14,9 @@ spec:
   generators:
     - list:
         elements:
-          - env: dev
-          - env: staging
-          - env: prod
+          - { env: dev,     chartRevision: main }
+          - { env: staging, chartRevision: main }
+          - { env: prod,    chartRevision: main }   # pin to a tag in real prod
   template:
     metadata:
       name: "service-a-{{ .env }}"
@@ -25,10 +25,19 @@ spec:
         env: "{{ .env }}"
     spec:
       project: team-a
-      source:
-        repoURL: https://github.com/praveshsignup-lab/company-monorepo.git
-        targetRevision: main
-        path: "platform-gitops/applications/service-a/overlays/{{ .env }}"
+      sources:
+        # 1) Chart from the service repo — single source of truth for app behaviour.
+        - repoURL: git@github-pravesh:praveshsignup-lab/service-a.git
+          targetRevision: "{{ .chartRevision }}"
+          path: chart
+          helm:
+            releaseName: "service-a"
+            valueFiles:
+              - "$gitops/platform-gitops/services/service-a/{{ .env }}/values.yaml"
+        # 2) Env values from this gitops repo, addressed via $gitops alias.
+        - repoURL: https://github.com/praveshsignup-lab/company-monorepo.git
+          targetRevision: main
+          ref: gitops
       destination:
         server: https://kubernetes.default.svc
         namespace: "team-a-{{ .env }}"
@@ -42,7 +51,4 @@ spec:
           - SkipDryRunOnMissingResource=true
         retry:
           limit: 5
-          backoff:
-            duration: 10s
-            factor: 2
-            maxDuration: 3m
+          backoff: { duration: 10s, factor: 2, maxDuration: 3m }

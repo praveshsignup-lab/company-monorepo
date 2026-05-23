@@ -10,6 +10,9 @@ spec:
   description: Applications owned by Team A (service-a, SLOs, dashboards)
   sourceRepos:
     - https://github.com/praveshsignup-lab/company-monorepo.git
+    # Team-owned service repo (chart lives here)
+    - git@github-pravesh:praveshsignup-lab/service-a.git
+    - https://github.com/praveshsignup-lab/service-a.git
   destinations:
     - namespace: team-a-*
       server: https://kubernetes.default.svc

@@ -1,3 +1,8 @@
+# Team A → service-b deployed to dev/staging/prod.
+# Multi-source Application: chart from service repo, env values from gitops repo.
+#
+#   App behavior change (new endpoint) -> PR to praveshsignup-lab/service-b
+#   Runtime change (replicas, mem)     -> PR to platform-gitops/services/service-b/<env>/values.yaml
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -9,9 +14,9 @@ spec:
   generators:
     - list:
         elements:
-          - env: dev
-          - env: staging
-          - env: prod
+          - { env: dev,     chartRevision: main }
+          - { env: staging, chartRevision: main }
+          - { env: prod,    chartRevision: main }   # pin to a tag in real prod
   template:
     metadata:
       name: "service-b-{{ .env }}"
@@ -20,10 +25,19 @@ spec:
         env: "{{ .env }}"
     spec:
       project: team-b
-      source:
-        repoURL: https://github.com/praveshsignup-lab/company-monorepo.git
-        targetRevision: main
-        path: "platform-gitops/applications/service-b/overlays/{{ .env }}"
+      sources:
+        # 1) Chart from the service repo — single source of truth for app behaviour.
+        - repoURL: git@github-pravesh:praveshsignup-lab/service-b.git
+          targetRevision: "{{ .chartRevision }}"
+          path: chart
+          helm:
+            releaseName: "service-b"
+            valueFiles:
+              - "$gitops/platform-gitops/services/service-b/{{ .env }}/values.yaml"
+        # 2) Env values from this gitops repo, addressed via $gitops alias.
+        - repoURL: https://github.com/praveshsignup-lab/company-monorepo.git
+          targetRevision: main
+          ref: gitops
       destination:
         server: https://kubernetes.default.svc
         namespace: "team-b-{{ .env }}"
@@ -37,7 +51,4 @@ spec:
           - SkipDryRunOnMissingResource=true
         retry:
           limit: 5
-          backoff:
-            duration: 10s
-            factor: 2
-            maxDuration: 3m
+          backoff: { duration: 10s, factor: 2, maxDuration: 3m }

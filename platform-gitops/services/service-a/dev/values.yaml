@@ -1,0 +1,8 @@
+# Runtime config for service-a @ dev. Owned by SRE/team-a.
+# Chart defaults live in the service-a repo at chart/values.yaml.
+replicas: 1
+resources:
+  requests: { cpu: 10m, memory: 16Mi }
+  limits:   { cpu: 100m, memory: 64Mi }
+slo:
+  objective: 95.0    # relaxed in dev — code is in flight

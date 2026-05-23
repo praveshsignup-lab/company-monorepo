@@ -1,0 +1,6 @@
+replicas: 3
+resources:
+  requests: { cpu: 100m, memory: 128Mi }
+  limits:   { cpu: 500m, memory: 256Mi }
+slo:
+  objective: 99.9    # tight in prod

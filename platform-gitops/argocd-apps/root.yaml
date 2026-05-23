@@ -15,7 +15,7 @@ spec:
     path: platform-gitops/argocd-apps
     directory:
       recurse: false
-      include: "{bootstrap-projects.yaml,observability-prometheus.yaml,observability.yaml,team-a-services.yaml,team-b-services.yaml,team-c-services.yaml,chaos.yaml}"
+      include: "{bootstrap-projects.yaml,observability.yaml,team-a-services.yaml,team-b-services.yaml,team-c-services.yaml}"
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd

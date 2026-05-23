@@ -51,41 +51,6 @@ alertmanager:
       requests:
         cpu: 50m
         memory: 128Mi
-    # Discover any AlertmanagerConfig with this label, in any namespace.
-    alertmanagerConfigSelector:
-      matchLabels:
-        alertmanagerConfig: platform
-    alertmanagerConfigNamespaceSelector: {}
-    # Don't auto-scope routes to the namespace they were defined in — our
-    # platform-routing config matches by `team` label cluster-wide.
-    alertmanagerConfigMatcherStrategy:
-      type: None
-  # Slack message templates referenced from AlertmanagerConfig
-  # (`{{ template "slack.platform.title" . }}`). Inlining via templateFiles is
-  # the only chart-supported way; ConfigMap mounts aren't picked up.
-  templateFiles:
-    slack.platform.tmpl: |
-      {{ define "slack.platform.title" -}}
-      [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }}
-      {{- if .CommonLabels.sloth_service }} — {{ .CommonLabels.sloth_service }}/{{ .CommonLabels.sloth_slo }}{{ end }}
-      {{- end }}
-
-      {{ define "slack.platform.text" -}}
-      {{ range .Alerts -}}
-      *Severity:* `{{ .Labels.severity }}`  *Team:* `{{ .Labels.team }}`
-      *Summary:* {{ .Annotations.summary }}
-      {{ if .Annotations.description }}*Detail:* {{ .Annotations.description }}{{ end }}
-      {{ if .Annotations.runbook_url -}}
-      *Runbook:* {{ .Annotations.runbook_url }}
-      {{- else -}}
-      :warning: *No runbook_url set — fix this alert's annotations (SRE Contract §5).*
-      {{- end }}
-      *Dashboards:*
-        • <https://grafana/d/slo-overview?var-service={{ .Labels.sloth_service }}|SLO Overview>
-        • <https://grafana/d/slo-registry|SLO Registry>
-      ---
-      {{ end -}}
-      {{- end }}
 
 grafana:
   enabled: true

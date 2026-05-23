@@ -1,0 +1,8 @@
+# Runtime config for service-b @ dev. Owned by SRE/team-b.
+# Chart defaults live in the service-b repo at chart/values.yaml.
+replicas: 1
+resources:
+  requests: { cpu: 10m, memory: 16Mi }
+  limits:   { cpu: 100m, memory: 64Mi }
+slo:
+  objective: 95.0    # relaxed in dev — code is in flight
