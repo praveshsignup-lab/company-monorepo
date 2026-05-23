@@ -28,6 +28,8 @@ spec:
       - CreateNamespace=true
       - ServerSideApply=true        # Sloth CRDs are large
       - ApplyOutOfSyncOnly=true
+      - SkipDryRunOnMissingResource=true  # CRD + CR shipped together
+      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
