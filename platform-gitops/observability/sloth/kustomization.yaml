@@ -3,5 +3,5 @@ kind: Kustomization
 namespace: sidekick-monitoring
 resources:
   # Upstream Sloth controller (CRDs + deployment).
-  - https://github.com/slok/sloth/releases/download/v0.11.0/sloth.yaml
+  - https://raw.githubusercontent.com/slok/sloth/v0.11.0/deploy/kubernetes/raw/sloth.yaml
   - sidekick-slos.yaml
