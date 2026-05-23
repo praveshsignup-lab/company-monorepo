@@ -1,0 +1,87 @@
+# kube-prometheus-stack Helm values.
+# Consumed by argocd-apps/observability-prometheus.yaml (Helm-typed Application).
+# Chart: https://prometheus-community.github.io/helm-charts/charts/kube-prometheus-stack
+fullnameOverride: kube-prometheus-stack
+
+defaultRules:
+  create: true
+  rules:
+    kubernetesSystem: true
+    kubernetesApps: true
+    kubernetesResources: true
+    kubernetesStorage: true
+
+# Allow Prometheus to discover ServiceMonitors / PodMonitors / Rules
+# in ANY namespace (not only its own) — required for ArgoCD's ServiceMonitor
+# living in 'argocd' and for team SLO rules living in team namespaces.
+prometheus:
+  prometheusSpec:
+    replicas: 1
+    retention: 15d
+    retentionSize: 20GiB
+    resources:
+      requests:
+        cpu: 200m
+        memory: 1Gi
+      limits:
+        memory: 2Gi
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+    serviceMonitorNamespaceSelector: {}
+    ruleNamespaceSelector: {}
+    podMonitorNamespaceSelector: {}
+    externalLabels:
+      cluster: sidekick
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 20Gi
+
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    replicas: 1
+    retention: 120h
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+
+grafana:
+  enabled: true
+  adminPassword: prom-operator # CHANGE: source from sealed-secret in prod
+  defaultDashboardsTimezone: utc
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: ALL
+      folderAnnotation: grafana_folder
+      provider:
+        foldersFromFilesStructure: true
+    datasources:
+      enabled: true
+      label: grafana_datasource
+      searchNamespace: ALL
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+kubeStateMetrics:
+  enabled: true
+
+nodeExporter:
+  enabled: true
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi

@@ -1,0 +1,48 @@
+# Standalone Alertmanager AlertmanagerConfig CRD (managed by Prometheus Operator).
+# Lives alongside kube-prometheus-stack so platform-sre owns global routing.
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: platform-routing
+  namespace: sidekick-monitoring
+  labels:
+    alertmanagerConfig: platform
+spec:
+  route:
+    receiver: "platform-sre-null"
+    groupBy: ["alertname", "namespace", "sloth_service"]
+    groupWait: 30s
+    groupInterval: 5m
+    repeatInterval: 4h
+    routes:
+      - matchers:
+          - name: sloth_service
+            value: sidekick
+        receiver: "platform-sre-null"
+        continue: false
+      - matchers:
+          - name: team
+            value: team-a
+        receiver: "team-a-null"
+      - matchers:
+          - name: team
+            value: team-b
+        receiver: "team-b-null"
+      - matchers:
+          - name: team
+            value: team-c
+        receiver: "team-c-null"
+  receivers:
+    # In real deployment: webhook configs to PagerDuty / Slack via sealed-secrets.
+    - name: "platform-sre-null"
+    - name: "team-a-null"
+    - name: "team-b-null"
+    - name: "team-c-null"
+  inhibitRules:
+    - sourceMatch:
+        - name: severity
+          value: critical
+      targetMatch:
+        - name: severity
+          value: warning
+      equal: ["alertname", "namespace"]

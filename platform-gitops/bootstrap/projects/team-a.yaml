@@ -1,0 +1,30 @@
+# Team A AppProject — owns service-a across dev/staging/prod.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: team-a
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Applications owned by Team A (service-a, SLOs, dashboards)
+  sourceRepos:
+    - https://github.com/praveshsignup-lab/company-monorepo.git
+  destinations:
+    - namespace: team-a-*
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  roles:
+    - name: developer
+      description: Team A developers can sync/override their own apps
+      policies:
+        - p, proj:team-a:developer, applications, *, team-a/*, allow
+        - p, proj:team-a:developer, logs, get, team-a/*, allow
+        - p, proj:team-a:developer, exec, create, team-a/*, deny
+      groups:
+        - team-a

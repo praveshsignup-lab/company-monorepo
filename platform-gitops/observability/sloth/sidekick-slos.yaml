@@ -1,0 +1,55 @@
+# Platform-owned SLO for the SideKick demo service.
+# Each team owns and ships its OWN PrometheusServiceLevel manifest in their
+# team-* namespace; this file is only the platform reference example.
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: sidekick
+  namespace: sidekick-monitoring
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    team: platform-sre
+spec:
+  service: "sidekick"
+  labels:
+    team: "platform-sre"
+    tier: "demo"
+  slos:
+    - name: "availability"
+      objective: 99.5
+      description: "99.5% of HTTP requests over 30 days return non-5xx."
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(http_requests_total{job="sidekick",code=~"5.."}[{{.window}}]))
+          totalQuery: |
+            sum(rate(http_requests_total{job="sidekick"}[{{.window}}]))
+      alerting:
+        name: SidekickAvailability
+        labels:
+          category: "availability"
+        pageAlert:
+          labels:
+            severity: critical
+        ticketAlert:
+          labels:
+            severity: warning
+    - name: "latency-p95-300ms"
+      objective: 99.0
+      description: "99% of requests faster than 300ms over 30 days."
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(http_request_duration_seconds_bucket{job="sidekick",le="0.3"}[{{.window}}]))
+          totalQuery: |
+            sum(rate(http_request_duration_seconds_count{job="sidekick"}[{{.window}}]))
+      alerting:
+        name: SidekickLatencyP95
+        labels:
+          category: "latency"
+        pageAlert:
+          labels:
+            severity: critical
+        ticketAlert:
+          labels:
+            severity: warning

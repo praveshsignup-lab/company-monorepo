@@ -1,0 +1,11 @@
+# Aggregated kustomization for non-Helm observability bits.
+# Prometheus stack itself is delivered as a Helm Application (see argocd-apps/),
+# this overlay just provisions the namespace + Alertmanager routing + Sloth SLOs
+# + Grafana dashboards that depend on the operator's CRDs being installed.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - alertmanager
+  - sloth
+  - grafana

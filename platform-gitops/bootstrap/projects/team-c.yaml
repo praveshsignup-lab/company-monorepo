@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: team-c
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Applications owned by Team C (service-c, SLOs, dashboards)
+  sourceRepos:
+    - https://github.com/praveshsignup-lab/company-monorepo.git
+  destinations:
+    - namespace: team-c-*
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  roles:
+    - name: developer
+      policies:
+        - p, proj:team-c:developer, applications, *, team-c/*, allow
+        - p, proj:team-c:developer, logs, get, team-c/*, allow
+        - p, proj:team-c:developer, exec, create, team-c/*, deny
+      groups:
+        - team-c

@@ -1,0 +1,45 @@
+# Grafana dashboards delivered as ConfigMaps; the kube-prometheus-stack
+# sidecar (label grafana_dashboard=1) auto-loads them.
+# Add additional dashboards as separate ConfigMaps with the same label.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sidekick-slo-dashboard
+  namespace: sidekick-monitoring
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "SLO"
+data:
+  sidekick-slo.json: |
+    {
+      "uid": "sidekick-slo",
+      "title": "SideKick — SLO / MWMBR",
+      "schemaVersion": 39,
+      "version": 1,
+      "timezone": "utc",
+      "panels": [
+        {
+          "type": "stat",
+          "title": "Availability — error budget remaining (30d)",
+          "targets": [
+            {
+              "expr": "1 - (slo:sli_error:ratio_rate30d{sloth_service=\"sidekick\",sloth_slo=\"availability\"} / (1 - 0.995))",
+              "refId": "A"
+            }
+          ],
+          "gridPos": {"x": 0, "y": 0, "w": 12, "h": 6}
+        },
+        {
+          "type": "timeseries",
+          "title": "Burn rate (1h)",
+          "targets": [
+            {
+              "expr": "slo:sli_error:ratio_rate1h{sloth_service=\"sidekick\"}",
+              "refId": "A"
+            }
+          ],
+          "gridPos": {"x": 0, "y": 6, "w": 24, "h": 8}
+        }
+      ]
+    }
