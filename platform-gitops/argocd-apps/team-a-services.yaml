@@ -27,7 +27,7 @@ spec:
       project: team-a
       sources:
         # 1) Chart from the service repo — single source of truth for app behaviour.
-        - repoURL: git@github-pravesh:praveshsignup-lab/service-a.git
+        - repoURL: https://github.com/praveshsignup-lab/service-a.git
           targetRevision: "{{ .chartRevision }}"
           path: chart
           helm:

@@ -10,7 +10,6 @@ spec:
   sourceRepos:
     - https://github.com/praveshsignup-lab/company-monorepo.git
     # Team-owned service repo (chart lives here)
-    - git@github-pravesh:praveshsignup-lab/service-c.git
     - https://github.com/praveshsignup-lab/service-c.git
   destinations:
     - namespace: team-c-*
