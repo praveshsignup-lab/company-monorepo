@@ -1,0 +1,161 @@
+# Generic SLO Overview dashboard — works for ANY service that publishes a
+# Sloth PrometheusServiceLevel. The platform contract is:
+#   - Sloth generates: slo:sli_error:ratio_rate{window}{sloth_service,sloth_slo}
+#   - Service teams own a PrometheusServiceLevel CR in their namespace.
+# This dashboard is parameterized via the $service template variable and is the
+# canonical SRE view; no per-service dashboard duplication needed.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: slo-overview-dashboard
+  namespace: sidekick-monitoring
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "SLO"
+data:
+  slo-overview.json: |
+    {
+      "uid": "slo-overview",
+      "title": "SLO — Service Overview (MWMBR)",
+      "schemaVersion": 39,
+      "version": 1,
+      "timezone": "utc",
+      "refresh": "30s",
+      "time": {"from": "now-6h", "to": "now"},
+      "tags": ["slo", "sre", "platform"],
+      "templating": {
+        "list": [
+          {
+            "name": "service",
+            "label": "Service",
+            "type": "query",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
+            "query": {"query": "label_values(slo:sli_error:ratio_rate30d, sloth_service)", "refId": "service"},
+            "refresh": 2,
+            "includeAll": false,
+            "multi": false,
+            "sort": 1
+          },
+          {
+            "name": "slo",
+            "label": "SLO",
+            "type": "query",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
+            "query": {"query": "label_values(slo:sli_error:ratio_rate30d{sloth_service=\"$service\"}, sloth_slo)", "refId": "slo"},
+            "refresh": 2,
+            "includeAll": true,
+            "multi": false,
+            "sort": 1
+          }
+        ]
+      },
+      "panels": [
+        {
+          "type": "stat",
+          "title": "Error budget remaining (30d)",
+          "description": "1 - (error_ratio_30d / (1 - objective)). 100% = budget intact, <0 = exhausted.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [
+            {
+              "expr": "1 - (slo:sli_error:ratio_rate30d{sloth_service=\"$service\",sloth_slo=~\"$slo\"} / on(sloth_id) slo:objective:ratio{sloth_service=\"$service\",sloth_slo=~\"$slo\"})",
+              "refId": "A",
+              "legendFormat": "{{sloth_slo}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "red", "value": null},
+                  {"color": "orange", "value": 0.1},
+                  {"color": "green", "value": 0.5}
+                ]
+              }
+            }
+          },
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"},
+          "gridPos": {"x": 0, "y": 0, "w": 8, "h": 6}
+        },
+        {
+          "type": "stat",
+          "title": "Current SLI (30d)",
+          "description": "Success ratio over the 30d window.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [
+            {
+              "expr": "1 - slo:sli_error:ratio_rate30d{sloth_service=\"$service\",sloth_slo=~\"$slo\"}",
+              "refId": "A",
+              "legendFormat": "{{sloth_slo}}"
+            }
+          ],
+          "fieldConfig": {"defaults": {"unit": "percentunit", "decimals": 4}},
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value"},
+          "gridPos": {"x": 8, "y": 0, "w": 8, "h": 6}
+        },
+        {
+          "type": "stat",
+          "title": "Objective",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [
+            {
+              "expr": "1 - slo:objective:ratio{sloth_service=\"$service\",sloth_slo=~\"$slo\"}",
+              "refId": "A",
+              "legendFormat": "{{sloth_slo}}"
+            }
+          ],
+          "fieldConfig": {"defaults": {"unit": "percentunit", "decimals": 4}},
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"]}},
+          "gridPos": {"x": 16, "y": 0, "w": 8, "h": 6}
+        },
+        {
+          "type": "timeseries",
+          "title": "Multi-window Multi-burn-rate (MWMBR)",
+          "description": "Burn rate over fast (1h, 6h) and slow (5m, 30m) windows. Page = fast AND slow > threshold. 1.0 = consuming budget at SLO pace.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [
+            {"expr": "slo:sli_error:ratio_rate5m{sloth_service=\"$service\",sloth_slo=~\"$slo\"} / on(sloth_id) slo:objective:ratio{sloth_service=\"$service\",sloth_slo=~\"$slo\"}", "refId": "A", "legendFormat": "{{sloth_slo}} 5m"},
+            {"expr": "slo:sli_error:ratio_rate30m{sloth_service=\"$service\",sloth_slo=~\"$slo\"} / on(sloth_id) slo:objective:ratio{sloth_service=\"$service\",sloth_slo=~\"$slo\"}", "refId": "B", "legendFormat": "{{sloth_slo}} 30m"},
+            {"expr": "slo:sli_error:ratio_rate1h{sloth_service=\"$service\",sloth_slo=~\"$slo\"} / on(sloth_id) slo:objective:ratio{sloth_service=\"$service\",sloth_slo=~\"$slo\"}", "refId": "C", "legendFormat": "{{sloth_slo}} 1h"},
+            {"expr": "slo:sli_error:ratio_rate6h{sloth_service=\"$service\",sloth_slo=~\"$slo\"} / on(sloth_id) slo:objective:ratio{sloth_service=\"$service\",sloth_slo=~\"$slo\"}", "refId": "D", "legendFormat": "{{sloth_slo}} 6h"}
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {"drawStyle": "line", "fillOpacity": 5, "lineWidth": 2},
+              "thresholds": {"mode": "absolute", "steps": [
+                {"color": "green", "value": null},
+                {"color": "orange", "value": 1},
+                {"color": "red", "value": 14.4}
+              ]},
+              "unit": "none"
+            }
+          },
+          "gridPos": {"x": 0, "y": 6, "w": 24, "h": 9}
+        },
+        {
+          "type": "timeseries",
+          "title": "Error ratio vs allowed (28d trailing)",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [
+            {"expr": "slo:sli_error:ratio_rate30d{sloth_service=\"$service\",sloth_slo=~\"$slo\"}", "refId": "A", "legendFormat": "{{sloth_slo}} observed"},
+            {"expr": "slo:objective:ratio{sloth_service=\"$service\",sloth_slo=~\"$slo\"}", "refId": "B", "legendFormat": "{{sloth_slo}} budget"}
+          ],
+          "fieldConfig": {"defaults": {"unit": "percentunit", "decimals": 4}},
+          "gridPos": {"x": 0, "y": 15, "w": 12, "h": 8}
+        },
+        {
+          "type": "table",
+          "title": "Firing SLO alerts",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [
+            {"expr": "ALERTS{sloth_service=\"$service\",alertstate=\"firing\"}", "refId": "A", "format": "table", "instant": true}
+          ],
+          "transformations": [
+            {"id": "organize", "options": {"excludeByName": {"__name__": true, "Time": true, "Value": true}}}
+          ],
+          "gridPos": {"x": 12, "y": 15, "w": 12, "h": 8}
+        }
+      ]
+    }

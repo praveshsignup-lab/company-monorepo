@@ -15,8 +15,10 @@ spec:
       path: /metrics
       interval: 30s
       relabelings:
-        - sourceLabels: [__meta_kubernetes_namespace]
+        - action: replace
+          sourceLabels: [__meta_kubernetes_namespace]
           targetLabel: namespace
         # Stamp job=service-c so SLO query labels are predictable.
-        - targetLabel: job
+        - action: replace
+          targetLabel: job
           replacement: service-c

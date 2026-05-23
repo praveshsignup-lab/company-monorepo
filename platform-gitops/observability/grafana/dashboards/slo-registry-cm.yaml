@@ -1,0 +1,80 @@
+# SLO Registry — single pane of glass listing every Sloth-registered SLO in
+# the cluster with current burn rate, error budget, and last-page status.
+# Auto-populates as teams add PrometheusServiceLevel CRs; zero per-team config.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: slo-registry-dashboard
+  namespace: sidekick-monitoring
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "SLO"
+data:
+  slo-registry.json: |
+    {
+      "uid": "slo-registry",
+      "title": "SLO — Registry (all services)",
+      "schemaVersion": 39,
+      "version": 1,
+      "timezone": "utc",
+      "refresh": "1m",
+      "time": {"from": "now-6h", "to": "now"},
+      "tags": ["slo", "sre", "platform"],
+      "panels": [
+        {
+          "type": "table",
+          "title": "All SLOs",
+          "description": "Every Sloth-registered SLO. Link the service column to drill into SLO Overview.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [
+            {"expr": "slo:objective:ratio", "refId": "OBJ", "format": "table", "instant": true},
+            {"expr": "slo:sli_error:ratio_rate30d", "refId": "ERR30D", "format": "table", "instant": true},
+            {"expr": "slo:sli_error:ratio_rate1h / on(sloth_id) slo:objective:ratio", "refId": "BURN1H", "format": "table", "instant": true},
+            {"expr": "sum by (sloth_service, sloth_slo) (ALERTS{sloth_severity=\"page\",alertstate=\"firing\"})", "refId": "PAGES", "format": "table", "instant": true}
+          ],
+          "transformations": [
+            {"id": "joinByField", "options": {"byField": "sloth_id", "mode": "outer"}},
+            {"id": "organize", "options": {
+              "excludeByName": {"Time 1": true, "Time 2": true, "Time 3": true, "Time 4": true, "__name__ 1": true, "__name__ 2": true, "__name__ 3": true, "__name__ 4": true, "sloth_mode 1": true, "sloth_mode 2": true, "sloth_mode 3": true, "sloth_mode 4": true, "sloth_window 1": true, "sloth_window 2": true, "sloth_window 3": true, "sloth_window 4": true},
+              "renameByName": {
+                "sloth_service 1": "service",
+                "sloth_slo 1": "slo",
+                "Value #OBJ": "objective",
+                "Value #ERR30D": "error_30d",
+                "Value #BURN1H": "burn_1h_x_budget",
+                "Value #PAGES": "pages_firing"
+              },
+              "indexByName": {"service": 0, "slo": 1, "objective": 2, "error_30d": 3, "burn_1h_x_budget": 4, "pages_firing": 5}
+            }}
+          ],
+          "fieldConfig": {
+            "defaults": {"custom": {"align": "left"}},
+            "overrides": [
+              {"matcher": {"id": "byName", "options": "objective"}, "properties": [{"id": "unit", "value": "percentunit"}, {"id": "decimals", "value": 4}]},
+              {"matcher": {"id": "byName", "options": "error_30d"}, "properties": [{"id": "unit", "value": "percentunit"}, {"id": "decimals", "value": 4}]},
+              {"matcher": {"id": "byName", "options": "burn_1h_x_budget"}, "properties": [
+                {"id": "decimals", "value": 2},
+                {"id": "thresholds", "value": {"mode": "absolute", "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "orange", "value": 1},
+                  {"color": "red", "value": 14.4}
+                ]}},
+                {"id": "custom.cellOptions", "value": {"type": "color-background"}}
+              ]},
+              {"matcher": {"id": "byName", "options": "pages_firing"}, "properties": [
+                {"id": "thresholds", "value": {"mode": "absolute", "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "red", "value": 1}
+                ]}},
+                {"id": "custom.cellOptions", "value": {"type": "color-background"}}
+              ]},
+              {"matcher": {"id": "byName", "options": "service"}, "properties": [{"id": "links", "value": [
+                {"title": "Drill into SLO Overview", "url": "/d/slo-overview?var-service=${__value.raw}"}
+              ]}]}
+            ]
+          },
+          "gridPos": {"x": 0, "y": 0, "w": 24, "h": 18}
+        }
+      ]
+    }

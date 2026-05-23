@@ -26,9 +26,12 @@ spec:
         labels:
           category: availability
           team: team-a
+        annotations:
+          summary: "service-a availability SLO burn"
+          runbook_url: "https://runbooks.example/team-a/service-a/availability"
         pageAlert:
           labels:
-            severity: critical
+            severity: page
         ticketAlert:
           labels:
-            severity: warning
+            severity: ticket

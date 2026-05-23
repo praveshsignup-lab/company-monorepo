@@ -1,5 +1,15 @@
 # Standalone Alertmanager AlertmanagerConfig CRD (managed by Prometheus Operator).
 # Lives alongside kube-prometheus-stack so platform-sre owns global routing.
+#
+# Routing model:
+#   - `team` label is the primary route key (set by every PrometheusServiceLevel).
+#   - `severity=page` → Slack #alerts-<team> channel.
+#   - `severity=ticket` → same channel, lower urgency (no @here).
+#   - Unrouted alerts fall through to platform-sre.
+#
+# Replace the webhook URLs in webhooks-secret.yaml with real ones (sealed-secret
+# in prod). The Slack receiver shape below is the platform default; teams that
+# need PagerDuty can layer their own AlertmanagerConfig in their namespace.
 apiVersion: monitoring.coreos.com/v1alpha1
 kind: AlertmanagerConfig
 metadata:
@@ -9,40 +19,60 @@ metadata:
     alertmanagerConfig: platform
 spec:
   route:
-    receiver: "platform-sre-null"
-    groupBy: ["alertname", "namespace", "sloth_service"]
+    receiver: "platform-sre-slack"
+    groupBy: ["alertname", "namespace", "sloth_service", "sloth_slo"]
     groupWait: 30s
     groupInterval: 5m
     repeatInterval: 4h
     routes:
-      - matchers:
-          - name: sloth_service
-            value: sidekick
-        receiver: "platform-sre-null"
-        continue: false
-      - matchers:
-          - name: team
-            value: team-a
-        receiver: "team-a-null"
-      - matchers:
-          - name: team
-            value: team-b
-        receiver: "team-b-null"
-      - matchers:
-          - name: team
-            value: team-c
-        receiver: "team-c-null"
+      - matchers: [{ name: team, value: team-a }]
+        receiver: "team-a-slack"
+      - matchers: [{ name: team, value: team-b }]
+        receiver: "team-b-slack"
+      - matchers: [{ name: team, value: team-c }]
+        receiver: "team-c-slack"
+      # Catch-all for SLO alerts without a team label — bug, but page platform.
+      - matchers: [{ name: sloth_id, regex: true, value: ".+" }]
+        receiver: "platform-sre-slack"
   receivers:
-    # In real deployment: webhook configs to PagerDuty / Slack via sealed-secrets.
-    - name: "platform-sre-null"
-    - name: "team-a-null"
-    - name: "team-b-null"
-    - name: "team-c-null"
+    - name: "platform-sre-slack"
+      slackConfigs:
+        - apiURL:
+            name: alertmanager-team-webhooks
+            key: platform-sre-slack
+          channel: "#alerts-platform-sre"
+          sendResolved: true
+          title: '{{ template "slack.platform.title" . }}'
+          text:  '{{ template "slack.platform.text"  . }}'
+    - name: "team-a-slack"
+      slackConfigs:
+        - apiURL:
+            name: alertmanager-team-webhooks
+            key: team-a-slack
+          channel: "#alerts-team-a"
+          sendResolved: true
+          title: '{{ template "slack.platform.title" . }}'
+          text:  '{{ template "slack.platform.text"  . }}'
+    - name: "team-b-slack"
+      slackConfigs:
+        - apiURL:
+            name: alertmanager-team-webhooks
+            key: team-b-slack
+          channel: "#alerts-team-b"
+          sendResolved: true
+          title: '{{ template "slack.platform.title" . }}'
+          text:  '{{ template "slack.platform.text"  . }}'
+    - name: "team-c-slack"
+      slackConfigs:
+        - apiURL:
+            name: alertmanager-team-webhooks
+            key: team-c-slack
+          channel: "#alerts-team-c"
+          sendResolved: true
+          title: '{{ template "slack.platform.title" . }}'
+          text:  '{{ template "slack.platform.text"  . }}'
   inhibitRules:
-    - sourceMatch:
-        - name: severity
-          value: critical
-      targetMatch:
-        - name: severity
-          value: warning
-      equal: ["alertname", "namespace"]
+    # A firing page suppresses tickets for the same SLO.
+    - sourceMatch: [{ name: severity, value: page }]
+      targetMatch: [{ name: severity, value: ticket }]
+      equal: ["sloth_service", "sloth_slo"]
