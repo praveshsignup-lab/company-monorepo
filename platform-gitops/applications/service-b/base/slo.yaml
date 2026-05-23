@@ -1,0 +1,34 @@
+# Team A owns this SLO. Sloth turns it into MWMBR recording + alerting rules.
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: service-b
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  service: "service-b"
+  labels:
+    team: "team-b"
+    tier: "demo"
+  slos:
+    - name: "availability"
+      objective: 99.5
+      description: "99.5% of HTTP requests over 30 days return non-5xx."
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(http_requests_total{job="service-b",code=~"5.."}[{{.window}}]))
+          totalQuery: |
+            sum(rate(http_requests_total{job="service-b"}[{{.window}}]))
+      alerting:
+        name: ServiceBAvailability
+        labels:
+          category: availability
+          team: team-b
+        pageAlert:
+          labels:
+            severity: critical
+        ticketAlert:
+          labels:
+            severity: warning

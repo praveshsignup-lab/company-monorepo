@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Namespace + replicas + image tag are supplied by env overlays.
+resources:
+  - deployment.yaml
+  - service.yaml
+  - servicemonitor.yaml
+  - slo.yaml
+commonLabels:
+  app.kubernetes.io/name: service-c
+  app.kubernetes.io/part-of: sidekick
+  team: team-c

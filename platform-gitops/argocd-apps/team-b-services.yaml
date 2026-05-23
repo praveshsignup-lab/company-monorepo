@@ -1,0 +1,43 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: team-b-services
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - list:
+        elements:
+          - env: dev
+          - env: staging
+          - env: prod
+  template:
+    metadata:
+      name: "service-b-{{ .env }}"
+      labels:
+        team: team-b
+        env: "{{ .env }}"
+    spec:
+      project: team-b
+      source:
+        repoURL: https://github.com/praveshsignup-lab/company-monorepo.git
+        targetRevision: main
+        path: "platform-gitops/applications/service-b/overlays/{{ .env }}"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "team-b-{{ .env }}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+          - SkipDryRunOnMissingResource=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m

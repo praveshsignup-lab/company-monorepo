@@ -1,0 +1,48 @@
+# Team A → service-a deployed to dev/staging/prod via list generator.
+# Each generated Application:
+#   - belongs to AppProject team-a
+#   - syncs path applications/service-a/overlays/{env}
+#   - deploys into namespace team-a-{env}
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: team-a-services
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - list:
+        elements:
+          - env: dev
+          - env: staging
+          - env: prod
+  template:
+    metadata:
+      name: "service-a-{{ .env }}"
+      labels:
+        team: team-a
+        env: "{{ .env }}"
+    spec:
+      project: team-a
+      source:
+        repoURL: https://github.com/praveshsignup-lab/company-monorepo.git
+        targetRevision: main
+        path: "platform-gitops/applications/service-a/overlays/{{ .env }}"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "team-a-{{ .env }}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+          - SkipDryRunOnMissingResource=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m

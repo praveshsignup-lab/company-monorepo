@@ -1,0 +1,22 @@
+# Scraped by the platform Prometheus (selectors are cluster-wide).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: service-b
+  labels:
+    # Must match kube-prometheus-stack's release label so it picks us up.
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: service-b
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        # Stamp job=service-b so SLO query labels are predictable.
+        - targetLabel: job
+          replacement: service-b
